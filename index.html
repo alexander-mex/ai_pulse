@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Pulse — Find AI tools fast</title>
+  <meta name="description" content="AI Pulse is a searchable directory of AI tools with saved favorites." />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+          colors: { ink: '#070b14', panel: '#0d1424', edge: '#1c2740', pulse: '#5eead4', volt: '#a78bfa' },
+        },
+      },
+    };
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    body {
+      background:
+        radial-gradient(60rem 30rem at 10% -10%, rgba(94,234,212,.08), transparent 60%),
+        radial-gradient(50rem 30rem at 100% 0%, rgba(167,139,250,.08), transparent 60%),
+        #070b14;
+    }
+    /* Shimmer for skeleton loaders */
+    .shimmer {
+      background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.1) 50%, rgba(255,255,255,.04) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite linear;
+    }
+    @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+    .card:hover { border-color: rgba(94,234,212,.4); box-shadow: 0 0 0 1px rgba(94,234,212,.15), 0 12px 40px -12px rgba(94,234,212,.2); }
+    @media (prefers-reduced-motion: reduce) { .shimmer { animation: none; } }
+  </style>
+</head>
+
+<body class="min-h-screen font-sans text-slate-200 antialiased">
+  <!-- Header: logo, search, favorites toggle -->
+  <header class="sticky top-0 z-30 border-b border-white/10 bg-ink/60 backdrop-blur-xl">
+    <div class="mx-auto flex max-w-[120rem] flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-10">
+      <a href="/" class="flex items-center gap-2 text-lg font-semibold tracking-tight text-white">
+        <span class="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-pulse to-volt text-ink">
+          <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+        </span>
+        AI Pulse
+      </a>
+
+      <label class="relative order-3 w-full sm:order-none sm:ml-4 sm:w-auto sm:flex-1 sm:max-w-xl">
+        <span class="sr-only">Search AI tools</span>
+        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="search" type="search" autocomplete="off" placeholder="Search tools by name, URL or description"
+          class="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-9 pr-3 text-sm text-white placeholder-slate-500 outline-none transition focus:border-pulse/60 focus:ring-2 focus:ring-pulse/20" />
+      </label>
+
+      <button id="fav-toggle" type="button" aria-pressed="false"
+        class="ml-auto inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-pulse/50 aria-pressed:border-pulse/50 aria-pressed:bg-pulse/10 aria-pressed:text-pulse sm:ml-0">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/></svg>
+        Favorites
+        <span id="fav-count" class="rounded-md bg-white/10 px-1.5 py-0.5 text-xs tabular-nums">0</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-[120rem] px-4 py-8 sm:px-6 lg:px-10">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-2">
+      <div>
+        <h1 id="view-title" class="text-2xl font-semibold tracking-tight text-white sm:text-3xl">AI tools</h1>
+        <p id="status" class="mt-1 text-sm text-slate-400" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <!-- Cards, skeletons, empty and error states render here -->
+    <section id="grid" aria-busy="false"
+      class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[2200px]:grid-cols-6 min-[3000px]:grid-cols-8"></section>
+    <div id="message" class="hidden"></div>
+
+    <div id="load-more-wrap" class="mt-10 hidden text-center">
+      <button id="load-more" type="button"
+        class="rounded-xl border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:border-pulse/50 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-pulse/50 disabled:opacity-60">
+        Load more
+      </button>
+    </div>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
