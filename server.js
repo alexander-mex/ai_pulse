@@ -1,7 +1,7 @@
 /**
  * Локальний сервер для AI Pulse (Node 18+, без залежностей).
  * - Роздає index.html та app.js
- * - /proxy?url=... пересилає запит до freeserp.ai на стороні сервера,
+ * - /api/proxy?url=... пересилає запит до freeserp.ai на стороні сервера,
  *   тому браузер працює з тим самим origin і проблеми CORS немає.
  *
  * Запуск:  node server.js   →   http://localhost:3000
@@ -21,7 +21,7 @@ http
     const url = new URL(req.url, `http://${req.headers.host}`);
 
     // --- API-проксі ---
-    if (url.pathname === '/proxy') {
+    if (url.pathname === '/api/proxy') {
       try {
         const target = new URL(url.searchParams.get('url') ?? '');
         if (target.hostname !== ALLOWED_HOST) {

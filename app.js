@@ -9,11 +9,12 @@
 const CONFIG = {
   // Базовий URL API
   TARGET_URL: 'https://freeserp.ai/api.php',
-  // Проксі пробуються по черзі, доки один не спрацює.
-  // 1) Локальний проксі з server.js (найнадійніший, без CORS взагалі)
-  // 2-4) Публічні проксі як запасні варіанти
-  PROXIES: [
-    (u) => `/proxy?url=${encodeURIComponent(u)}`,
+  // URL твого Cloudflare Worker (див. worker.js). Якщо вказано, використовується першим.
+  // Приклад: 'https://ai-pulse-proxy.your-name.workers.dev'
+  WORKER_URL: '',
+  TIMEOUT_MS: 8000, // Скільки чекаємо відповідь від одного проксі, потім пробуємо наступний
+  // Публічні проксі: запасний варіант, можуть бути нестабільними
+  PUBLIC_PROXIES: [
     (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
     (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
     (u) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`,
@@ -103,18 +104,49 @@ function buildTargetUrl(from = 0) {
   return target.toString();
 }
 
+/** Fetch з таймаутом: зависла відповідь не блокує решту проксі */
+async function fetchJson(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), CONFIG.TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: ctrl.signal });
+    if (!response.ok) throw new Error(`Сервер відповів із статусом ${response.status}.`);
+    return await response.json(); // Кине помилку, якщо прийшов HTML замість JSON
+  } catch (err) {
+    throw err.name === 'AbortError' ? new Error('Проксі не відповів вчасно.') : err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Той самий домен: api/proxy.js на Vercel або server.js локально (CORS не потрібен)
+const sameOriginProxy = (u) => `/api/proxy?url=${encodeURIComponent(u)}`;
+const workerProxy = (u) => `${CONFIG.WORKER_URL}?url=${encodeURIComponent(u)}`; // worker.js
+let workingProxy = null; // Запам'ятовуємо проксі, що вже спрацював
+
+/** Порядок спроб: той, що вже працював → Worker → свій домен → публічні */
+function proxyList() {
+  const list = [
+    ...(CONFIG.WORKER_URL ? [workerProxy] : []),
+    sameOriginProxy,
+    ...CONFIG.PUBLIC_PROXIES,
+  ];
+  return workingProxy ? [workingProxy, ...list.filter((p) => p !== workingProxy)] : list;
+}
+
 /** Запит даних: пробуємо проксі по черзі, поки один не поверне валідний JSON */
 async function fetchTools(from = 0) {
   const target = buildTargetUrl(from);
   let lastError;
 
-  for (const makeUrl of CONFIG.PROXIES) {
+  for (const makeUrl of proxyList()) {
     try {
-      const response = await fetch(makeUrl(target));
-      if (!response.ok) throw new Error(`Сервер відповів із статусом ${response.status}.`);
-      return await response.json(); // Кине помилку, якщо прийшов HTML замість JSON
+      const data = await fetchJson(makeUrl(target));
+      workingProxy = makeUrl;
+      return data;
     } catch (err) {
       console.warn('Проксі не спрацював, пробую наступний:', err.message);
+      if (makeUrl === workingProxy) workingProxy = null;
       lastError = err;
     }
   }
